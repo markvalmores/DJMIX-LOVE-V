@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>DJMIX LOVE V</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100..900;1,100..900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Exo 2', sans-serif;
+        background-color: #0f172a;
+        color: white;
+        overflow: hidden; /* App-like feel */
+        touch-action: none; /* Prevent pull-to-refresh and scrolling on game area */
+        -webkit-user-select: none; /* Safari */
+        user-select: none;
+        
+        /* Firefox scrollbar styling */
+        scrollbar-width: thin;
+        scrollbar-color: #ec4899 rgba(0, 0, 0, 0.2);
+      }
+      .anime-font {
+        font-family: 'Orbitron', sans-serif;
+      }
+      
+      /* Custom Webkit scrollbar for game lists (Inventory, etc.) */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 5px;
+        margin: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #ec4899;
+        border-radius: 5px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #db2777;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+
+      /* Rhythm Game Feedback Animations - Refined */
+      @keyframes feedback-perfect {
+        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; filter: brightness(2); }
+        40% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: brightness(1); }
+        80% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+        100% { transform: translate(-50%, -60%) scale(1.1); opacity: 0; }
+      }
+      @keyframes feedback-great {
+        0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+        50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+        100% { transform: translate(-50%, -55%) scale(1.0); opacity: 0; }
+      }
+      @keyframes feedback-miss {
+        0% { transform: translate(-50%, -50%) rotate(0deg); opacity: 0; }
+        20% { transform: translate(-52%, -50%) rotate(-5deg); opacity: 1; }
+        40% { transform: translate(-48%, -50%) rotate(5deg); }
+        60% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -40%) scale(0.8); opacity: 0; }
+      }
+      
+      @keyframes combo-pulse {
+        0% { transform: scale(1); filter: brightness(1); }
+        50% { transform: scale(1.05); filter: brightness(1.2); }
+        100% { transform: scale(1); filter: brightness(1); }
+      }
+
+      /* Pet Running Animation */
+      @keyframes pet-run {
+        0% { left: 0%; transform: scaleX(1); }
+        49% { transform: scaleX(1); }
+        50% { left: 90%; transform: scaleX(-1); }
+        99% { transform: scaleX(-1); }
+        100% { left: 0%; transform: scaleX(1); }
+      }
+
+      .anim-perfect { animation: feedback-perfect 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+      .anim-great { animation: feedback-great 0.4s ease-out forwards; }
+      .anim-nice { animation: feedback-great 0.4s ease-out forwards; } /* Reusing great for nice but styled differently */
+      .anim-miss { animation: feedback-miss 0.4s ease-in forwards; }
+      .anim-combo { animation: combo-pulse 0.1s linear; }
+      .animate-pet-run { animation: pet-run 8s linear infinite; }
+
+      /* Gacha Animations */
+      @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        10% { transform: translate(-1px, -2px) rotate(-1deg); }
+        20% { transform: translate(-3px, 0px) rotate(1deg); }
+        30% { transform: translate(3px, 2px) rotate(0deg); }
+        40% { transform: translate(1px, -1px) rotate(1deg); }
+        50% { transform: translate(-1px, 2px) rotate(-1deg); }
+        60% { transform: translate(-3px, 1px) rotate(0deg); }
+        70% { transform: translate(3px, 1px) rotate(-1deg); }
+        80% { transform: translate(-1px, -1px) rotate(1deg); }
+        90% { transform: translate(1px, 2px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+      }
+
+      @keyframes pop-in {
+        0% { transform: scale(0); opacity: 0; }
+        70% { transform: scale(1.1); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      /* Gacha Sunburst Effect */
+      @keyframes sunburst {
+        0% { transform: rotate(0deg); opacity: 0; }
+        50% { opacity: 0.5; }
+        100% { transform: rotate(180deg); opacity: 0; }
+      }
+
+      @keyframes sparkle {
+        0% { transform: scale(0) rotate(0deg); opacity: 0; }
+        50% { transform: scale(1) rotate(180deg); opacity: 1; }
+        100% { transform: scale(0) rotate(360deg); opacity: 0; }
+      }
+
+      .animate-shake { animation: shake 0.5s infinite; }
+      .animate-pop-in { animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+      .animate-spin-slow { animation: spin-slow 10s linear infinite; }
+      .animate-sunburst { animation: sunburst 3s linear infinite; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
