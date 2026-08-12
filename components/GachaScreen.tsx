@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayerProfile, GachaType, GachaItem } from '../types';
-import { getPlayerProfile, updatePlayerProfile, equipItem, unequipItem, sellItem, addCustomItem } from '../services/playerService';
+import { getPlayerProfile, updatePlayerProfile, equipItem, unequipItem, sellItem, addCustomItem } from '../services/firebasePlayerService';
 import { generateGachaSkin } from '../services/geminiService';
 
 const GachaScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {

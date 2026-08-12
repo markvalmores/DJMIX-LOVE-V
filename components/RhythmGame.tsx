@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { RhythmNote, PlayerProfile, Song } from '../types';
-import { getPlayerProfile, addCredits, updateSettings, setKeybinds, DEFAULT_AVATARS } from '../services/playerService';
+import { getPlayerProfile, addCredits, updateSettings, setKeybinds, DEFAULT_AVATARS } from '../services/firebasePlayerService';
 
 enum GameState {
   START_SCREEN = 'START_SCREEN',

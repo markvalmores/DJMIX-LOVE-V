@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GameMode, PlayerProfile, Friend, ChatMessage } from '../types';
-import { DEFAULT_AVATARS, setAvatar, setUsername, DEFAULT_WALLPAPER } from '../services/playerService';
+import { DEFAULT_AVATARS, setAvatar, setUsername, DEFAULT_WALLPAPER } from '../services/firebasePlayerService';
 import { generateAiAvatar, generateChatReply } from '../services/geminiService';
 import { getFriends, toggleFollow } from '../services/socialService';
+import { subscribeToStats, simulateActivePlayers, recordPlayerJoin } from '../services/firebaseStatsService';
 
 interface MainMenuProps {
   onSelectMode: (mode: GameMode) => void;
@@ -21,13 +22,25 @@ const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode, profile: initialProfi
   const [totalGamers, setTotalGamers] = useState(50349);
 
   useEffect(() => {
+      // Record our join on mount
+      recordPlayerJoin();
+
+      const unsubscribe = subscribeToStats((stats) => {
+          setActivePlayers(stats.activePlayers);
+          setTotalGamers(stats.totalGamers);
+      });
+
       const statsInterval = setInterval(() => {
-          setActivePlayers(prev => prev + Math.floor(Math.random() * 11) - 5);
-          if (Math.random() > 0.8) {
-              setTotalGamers(prev => prev + 1);
+          // One client randomly drives the active players simulation up or down
+          if (Math.random() > 0.7) {
+              simulateActivePlayers();
           }
-      }, 3000);
-      return () => clearInterval(statsInterval);
+      }, 5000);
+
+      return () => {
+          unsubscribe();
+          clearInterval(statsInterval);
+      };
   }, []);
 
   

@@ -6,16 +6,17 @@ import GachaScreen from './components/GachaScreen';
 import TitleScreen from './components/TitleScreen';
 import { GameMode, PlayerProfile } from './types';
 import { getPlayerProfile } from './services/playerService';
+import { subscribeToProfile } from './services/firebasePlayerService';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<GameMode>(GameMode.TITLE);
   const [profile, setProfile] = useState<PlayerProfile>(getPlayerProfile());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProfile(getPlayerProfile());
-    }, 1000);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeToProfile((updatedProfile) => {
+      setProfile(updatedProfile);
+    });
+    return () => unsubscribe();
   }, []);
 
   const renderContent = () => {
