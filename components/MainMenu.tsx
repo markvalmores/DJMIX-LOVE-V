@@ -16,6 +16,21 @@ const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode, profile: initialProfi
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   
+  // Realtime Stats
+  const [activePlayers, setActivePlayers] = useState(1402);
+  const [totalGamers, setTotalGamers] = useState(50349);
+
+  useEffect(() => {
+      const statsInterval = setInterval(() => {
+          setActivePlayers(prev => prev + Math.floor(Math.random() * 11) - 5);
+          if (Math.random() > 0.8) {
+              setTotalGamers(prev => prev + 1);
+          }
+      }, 3000);
+      return () => clearInterval(statsInterval);
+  }, []);
+
+  
   // Social & Chat State
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -147,19 +162,36 @@ const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode, profile: initialProfi
            </div>
         </div>
 
-        <button 
-            onClick={() => setShowSocialModal(true)}
-            className="bg-black/40 hover:bg-black/60 border border-white/10 p-4 rounded-2xl flex items-center gap-4 transition-all hover:scale-105"
-        >
-            <div className="relative">
-                <div className="text-2xl">💬</div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+        <div className="flex items-center gap-4">
+            <div className="bg-black/60 border border-white/10 p-4 rounded-2xl flex flex-col items-end">
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-sm font-bold text-green-400 uppercase tracking-wider">Active Players</span>
+                </div>
+                <div className="text-2xl font-black">{activePlayers.toLocaleString()}</div>
             </div>
-            <div className="text-left hidden md:block">
-                <div className="font-bold text-sm">SOCIAL HUB</div>
-                <div className="text-[10px] text-gray-400">{friends.filter(f => f.status === 'ONLINE').length} FRIENDS ONLINE</div>
+            
+            <div className="bg-black/60 border border-white/10 p-4 rounded-2xl flex flex-col items-end">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-cyan-400 uppercase tracking-wider">Total Gamers</span>
+                </div>
+                <div className="text-2xl font-black text-white">{totalGamers.toLocaleString()}</div>
             </div>
-        </button>
+
+            <button 
+                onClick={() => setShowSocialModal(true)}
+                className="bg-black/40 hover:bg-black/60 border border-white/10 p-4 rounded-2xl flex items-center gap-4 transition-all hover:scale-105 ml-2"
+            >
+                <div className="relative">
+                    <div className="text-2xl">💬</div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                </div>
+                <div className="text-left hidden md:block">
+                    <div className="font-bold text-sm">SOCIAL HUB</div>
+                    <div className="text-[10px] text-gray-400">{friends.filter(f => f.status === 'ONLINE').length} FRIENDS ONLINE</div>
+                </div>
+            </button>
+        </div>
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-8 gap-8 max-w-6xl mx-auto w-full">
