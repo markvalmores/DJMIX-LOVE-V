@@ -130,13 +130,21 @@ const GachaScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
 
         <div className="flex gap-1 overflow-x-auto px-4 py-2 no-scrollbar bg-slate-900/50">
-             {['EFFECT', 'TILE', 'AVATAR', 'GEAR', 'WALLPAPER', 'PET'].map((t) => (
+             {[
+               { id: 'GEAR', icon: '🎛️', label: 'GEAR (PLAYZONE)' },
+               { id: 'TILE', icon: '💎', label: 'NOTE TILES' },
+               { id: 'EFFECT', icon: '💫', label: 'HIT EFFECTS' },
+               { id: 'AVATAR', icon: '👤', label: 'AVATARS' },
+               { id: 'WALLPAPER', icon: '🖼️', label: 'WALLPAPERS' },
+               { id: 'PET', icon: '🤖', label: 'PETS' }
+             ].map((tab) => (
                  <button 
-                    key={t}
-                    onClick={() => { setSelectedTab(t as GachaType); setLatestPull(null); setSellingId(null); }} 
-                    className={`flex-shrink-0 px-6 py-3 rounded-t-2xl font-black text-xs transition-all ${selectedTab === t ? 'bg-slate-800 text-white border-t-2 border-pink-500 translate-y-[2px]' : 'text-gray-500 hover:text-gray-300'}`}
+                    key={tab.id}
+                    onClick={() => { setSelectedTab(tab.id as GachaType); setLatestPull(null); setSellingId(null); }} 
+                    className={`flex-shrink-0 px-5 py-3 rounded-t-2xl font-black text-xs transition-all flex items-center gap-2 ${selectedTab === tab.id ? 'bg-slate-800 text-white border-t-2 border-pink-500 translate-y-[2px]' : 'text-gray-500 hover:text-gray-300'}`}
                 >
-                    {t}
+                    <span className="text-sm">{tab.icon}</span>
+                    <span>{tab.label}</span>
                 </button>
              ))}
         </div>
@@ -145,9 +153,14 @@ const GachaScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             
             {/* Machine */}
             <div className="flex-1 bg-slate-900 rounded-3xl border border-white/5 p-8 flex flex-col items-center justify-center relative shadow-2xl overflow-hidden">
-                <div className="text-6xl mb-8 group-hover:scale-110 transition-transform">
-                    {selectedTab === 'EFFECT' ? '💫' : selectedTab === 'TILE' ? '💎' : '🎁'}
+                <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">
+                    {selectedTab === 'EFFECT' ? '💫' : selectedTab === 'TILE' ? '💎' : selectedTab === 'GEAR' ? '🎛️' : selectedTab === 'PET' ? '🤖' : selectedTab === 'WALLPAPER' ? '🖼️' : '👤'}
                 </div>
+                {selectedTab === 'GEAR' && (
+                    <div className="text-[11px] font-bold text-indigo-400 tracking-widest uppercase mb-4 bg-indigo-950/60 px-4 py-1 rounded-full border border-indigo-500/30">
+                        DJMAX PORTABLE 2 PLAYFIELD GEARS
+                    </div>
+                )}
 
                 <div className="w-56 h-72 bg-black rounded-3xl border-2 border-white/10 flex items-center justify-center mb-8 relative overflow-hidden group">
                     {isRolling ? (
@@ -210,8 +223,8 @@ const GachaScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         const isEquipped = equippedItemId === item.id;
                         return (
                             <div key={item.id} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all ${isEquipped ? 'bg-pink-500/10 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.15)]' : 'bg-black/40 border-white/5 hover:bg-black/60'}`}>
-                                <div className="w-16 h-16 bg-black rounded-xl overflow-hidden border border-white/10 shrink-0 shadow-inner">
-                                    <img src={item.image} className="w-full h-full object-cover" />
+                                <div className={`${selectedTab === 'GEAR' ? 'w-24 h-14' : 'w-16 h-16'} bg-slate-950 rounded-xl overflow-hidden border border-white/10 shrink-0 shadow-inner flex items-center justify-center p-0.5`}>
+                                    <img src={item.image} className={`w-full h-full ${selectedTab === 'GEAR' ? 'object-contain' : 'object-cover'}`} />
                                 </div>
                                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                                     <div className="font-black text-sm truncate text-white drop-shadow-sm">{item.name}</div>

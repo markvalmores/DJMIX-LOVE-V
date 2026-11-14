@@ -121,4 +121,4 @@ export const setAvatar = (url: string) => updatePlayerProfile(p => ({ ...p, avat
 export const setUsername = (name: string) => updatePlayerProfile(p => ({ ...p, username: name }));
 export const addCredits = (amount: number) => updatePlayerProfile(p => ({ ...p, credits: p.credits + amount }));
 export const setKeybinds = (binds: string[]) => updatePlayerProfile(p => ({ ...p, keybinds: binds }));
-export { DEFAULT_AVATARS, DEFAULT_WALLPAPER, getPlayerProfile } from './playerService';
+export { DEFAULT_AVATARS, DEFAULT_WALLPAPER, getPlayerProfile, STARTER_GEARS } from './playerService';

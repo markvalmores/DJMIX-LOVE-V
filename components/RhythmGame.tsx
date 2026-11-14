@@ -108,6 +108,15 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const [profile, setProfileState] = useState(getPlayerProfile());
   const profileRef = useRef(profile); // Ref to access latest profile inside loops
+  const feedbackRef = useRef<{ text: string; color: string; percent: number; scale: number; timestamp: number } | null>(null);
+
+  useEffect(() => {
+      if (feedback) {
+          feedbackRef.current = { ...feedback, timestamp: performance.now() };
+      } else {
+          feedbackRef.current = null;
+      }
+  }, [feedback]);
 
   useEffect(() => {
       profileRef.current = profile;
@@ -421,6 +430,25 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       if (healthRef.current <= 0) setGameState(GameState.GAME_OVER);
   };
 
+  // Authentic DJMax Portable 2 default playfield gear metrics (left-aligned on widescreen)
+  const computeGearMetrics = (width: number, height: number) => {
+      const isWide = width >= 640;
+      const gearWidth = isWide
+          ? Math.min(440, Math.max(300, width * 0.35))
+          : Math.min(400, width - 16);
+      const gearX = isWide
+          ? Math.max(16, width * 0.025)
+          : (width - gearWidth) / 2;
+      const railWidth = Math.max(20, Math.min(28, gearWidth * 0.068));
+      const playAreaX = gearX + railWidth;
+      const playAreaWidth = gearWidth - (railWidth * 2);
+      const laneWidth = playAreaWidth / 4;
+      const topDeckH = 44;
+      const bottomDeckH = 92;
+      const hitLineY = height - bottomDeckH - 12;
+      return { gearWidth, gearX, railWidth, playAreaX, playAreaWidth, laneWidth, hitLineY, topDeckH, bottomDeckH };
+  };
+
   const handlePress = useCallback((lane: number) => {
      lanePressedRef.current[lane] = true;
      playHitSound();
@@ -435,9 +463,9 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
          if (canvas) {
              const dpr = Math.min(window.devicePixelRatio || 1, 2);
              const width = canvas.width / dpr;
-             const laneWidth = width / 4;
-             const hitLineY = (canvas.height / dpr) * 0.85;
-             createBurst(lane * laneWidth + laneWidth / 2, hitLineY);
+             const height = canvas.height / dpr;
+             const { playAreaX, laneWidth, hitLineY } = computeGearMetrics(width, height);
+             createBurst(playAreaX + lane * laneWidth + laneWidth / 2, hitLineY);
          }
          return;
      }
@@ -453,9 +481,10 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
        const canvas = canvasRef.current;
        if (canvas) {
            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-           const hitLineY = (canvas.height / dpr) * 0.85;
-           const laneWidth = (canvas.width / dpr) / 4;
-           createBurst(lane * laneWidth + laneWidth / 2, hitLineY);
+           const width = canvas.width / dpr;
+           const height = canvas.height / dpr;
+           const { playAreaX, laneWidth, hitLineY } = computeGearMetrics(width, height);
+           createBurst(playAreaX + lane * laneWidth + laneWidth / 2, hitLineY);
        }
 
        if (note.type === 'HOLD') {
@@ -605,100 +634,171 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     // Clear
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    
-    // DRAW GEAR BACKGROUND
-    if (assets.gear && assets.gear.complete && assets.gear.naturalWidth !== 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.4; // Semi-transparent to see video
-        ctx.drawImage(assets.gear, 0, 0, width, height); // Fit screen
-        ctx.restore();
-    }
 
-    // FEVER VISUAL OVERLAY
+    // Compute DJMax Portable 2 default gear metrics (left-aligned on widescreen)
+    const { gearWidth, gearX, railWidth, playAreaX, playAreaWidth, laneWidth, hitLineY, topDeckH, bottomDeckH } = computeGearMetrics(width, height);
+    const gearTop = 10;
+    const gearBottom = height - 10;
+    const gearHeight = gearBottom - gearTop;
+    const trackTop = gearTop + topDeckH;
+    const trackHeight = hitLineY - trackTop;
+
+    // 1. Subtle Fullscreen Fever Atmosphere (leaves BGA visible on right)
     if (isFeverActiveRef.current) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        
-        // Pulsating glow
-        const pulse = Math.sin(currentTimeMs / 50) * 0.15 + 0.15; // 0.0 to 0.3
-        
+        const pulse = Math.sin(currentTimeMs / 60) * 0.08 + 0.09;
         const grad = ctx.createLinearGradient(0, height, 0, 0);
-        grad.addColorStop(0, `rgba(251, 191, 36, ${pulse + 0.2})`); // Amber
-        grad.addColorStop(1, `rgba(236, 72, 153, ${pulse})`); // Pink
-        
+        grad.addColorStop(0, `rgba(56, 189, 248, ${pulse + 0.08})`);
+        grad.addColorStop(0.5, `rgba(251, 191, 36, ${pulse})`);
+        grad.addColorStop(1, 'transparent');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, width, height);
-
-        // Rising speed lines
-        for (let i = 0; i < 30; i++) {
-            const lineX = (Math.sin(i * 123.45) * 0.5 + 0.5) * width;
-            const lineY = (currentTimeMs * (0.5 + Math.sin(i)*0.2) + i * 100) % height;
-            ctx.fillStyle = `rgba(255, 255, 255, ${Math.sin(i)*0.2 + 0.3})`;
-            ctx.fillRect(lineX, height - lineY, 2 + Math.sin(i)*2, 50 + Math.sin(i)*50);
-        }
         ctx.restore();
     }
-    
-    const hitLineY = height * 0.85;
-    const laneWidth = width / 4;
+
+    // 2. Outer Drop Shadow behind DMP2 Hardware Gear
+    ctx.save();
+    ctx.shadowColor = isFeverActiveRef.current ? 'rgba(251, 191, 36, 0.55)' : 'rgba(56, 189, 248, 0.35)';
+    ctx.shadowBlur = 28;
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(gearX, gearTop, gearWidth, gearHeight, 14);
+    ctx.fill();
+    ctx.restore();
+
+    // 3. Brushed Metallic Silver / Chrome Gear Outer Casing
+    const frameGrad = ctx.createLinearGradient(gearX, gearTop, gearX + gearWidth, gearTop);
+    frameGrad.addColorStop(0, '#475569');
+    frameGrad.addColorStop(0.08, '#cbd5e1');
+    frameGrad.addColorStop(0.25, '#94a3b8');
+    frameGrad.addColorStop(0.5, '#64748b');
+    frameGrad.addColorStop(0.75, '#94a3b8');
+    frameGrad.addColorStop(0.92, '#cbd5e1');
+    frameGrad.addColorStop(1, '#334155');
+    ctx.fillStyle = frameGrad;
+    ctx.beginPath();
+    ctx.roundRect(gearX, gearTop, gearWidth, gearHeight, 14);
+    ctx.fill();
+
+    // Outer metallic specular edge & dark inset border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(gearX + 1, gearTop + 1, gearWidth - 2, gearHeight - 2, 13);
+    ctx.stroke();
+
+    // 4. Inner Recessed Playfield Glass Backdrop
+    ctx.fillStyle = 'rgba(7, 11, 22, 0.9)';
+    ctx.fillRect(playAreaX, trackTop, playAreaWidth, hitLineY - trackTop + 4);
+
+    // Custom / Gacha Gear Skin overlay (only when a custom/gacha gear skin is equipped)
+    const activeGearId = profileRef.current.equipped.gearId;
+    if (activeGearId && !activeGearId.startsWith('gear_') && assets.gear && assets.gear.complete && assets.gear.naturalWidth !== 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(assets.gear, playAreaX, trackTop, playAreaWidth, hitLineY - trackTop);
+        ctx.restore();
+    }
+
+    // 5. 4B Lanes (DMP2 Classic Silver-Ice Outer & Electric-Blue Inner)
+    for (let i = 0; i < 4; i++) {
+        const lx = playAreaX + i * laneWidth;
+        const isOuter = (i === 0 || i === 3);
+        ctx.fillStyle = isOuter ? 'rgba(226, 232, 240, 0.04)' : 'rgba(14, 165, 233, 0.085)';
+        ctx.fillRect(lx, trackTop, laneWidth, hitLineY - trackTop);
+
+        if (i > 0) {
+            ctx.fillStyle = 'rgba(203, 213, 225, 0.16)';
+            ctx.fillRect(lx - 0.5, trackTop, 1, hitLineY - trackTop);
+        }
+    }
+
+    // Scrolling subtle horizontal measure grid lines inside track
+    const beatMs = (60 / (selectedSong?.bpm || 120)) * 1000;
+    const measureOffset = ((currentTimeMs % beatMs) / beatMs) * 72;
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.07)';
+    for (let gy = trackTop + measureOffset; gy < hitLineY; gy += 72) {
+        ctx.fillRect(playAreaX, gy, playAreaWidth, 1);
+    }
+
+    // Inner ice-blue track trim lines along left & right edges of playfield
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#38bdf8';
+    ctx.fillRect(playAreaX - 1.5, trackTop, 1.5, hitLineY - trackTop);
+    ctx.fillRect(playAreaX + playAreaWidth, trackTop, 1.5, hitLineY - trackTop);
+
+    // 6. Clipped Playfield Content (Keybeams + Notes stay cleanly inside the DMP2 Glass Track!)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(playAreaX, trackTop, playAreaWidth, hitLineY - trackTop + 12);
+    ctx.clip();
+
+    // Key Press Beams (Crisp ice-blue / white vertical glow)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+        if (lanePressedRef.current[i]) {
+            const lx = playAreaX + i * laneWidth;
+            const centerX = lx + laneWidth / 2;
+            const isOuter = (i === 0 || i === 3);
+            const beamColor = isFeverActiveRef.current ? '#fbbf24' : (isOuter ? '#e0f2fe' : '#38bdf8');
+            const beamGrad = ctx.createLinearGradient(centerX, hitLineY, centerX, hitLineY - 320);
+            beamGrad.addColorStop(0, `${beamColor}aa`);
+            beamGrad.addColorStop(0.55, `${beamColor}33`);
+            beamGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = beamGrad;
+            ctx.fillRect(lx + 1, hitLineY - 320, laneWidth - 2, 320);
+        }
+    }
+    ctx.restore();
 
     // SPAWN LOGIC (Time Based)
-    const spawnCutoff = (selectedSong?.duration || 0) * 1000 - 3000; // Stop 3s before end
+    const spawnCutoff = (selectedSong?.duration || 0) * 1000 - 3000;
     const beatInterval = (60 / (selectedSong?.bpm || 120)) * 1000;
 
     if (currentTimeMs < spawnCutoff && currentTimeMs - lastNoteTimeRef.current > beatInterval) {
-      // 20% Chance for Hold Note
       const isHold = Math.random() > 0.8;
-      const length = isHold ? Math.min(800, beatInterval * 3) : 0; // Max hold length cap
+      const length = isHold ? Math.min(800, beatInterval * 3) : 0;
       
       notesRef.current.push({ 
         id: Date.now() + Math.random(), 
         lane: Math.floor(Math.random() * 4) as any, 
-        y: -100, // Visual only, not logic
+        y: -100,
         hit: false, 
         type: isHold ? 'HOLD' : 'TAP', 
         length: length,
         spawnTime: currentTimeMs,
         targetTime: currentTimeMs + noteSpeed 
       });
-      // Important: Add length to lastNoteTime to prevent notes spawning "inside" the hold note
       lastNoteTimeRef.current = currentTimeMs + length;
     }
 
-    // UPDATE & DRAW NOTES
-    // Use additive blending for "glow" without expensive shadows
+    // UPDATE & DRAW NOTES (DMP2 Classic Silver-White & Electric Blue)
     ctx.globalCompositeOperation = 'lighter'; 
 
     notesRef.current = notesRef.current.filter(n => {
-      // Calculate Y based on Time Delta for smooth sync
       const timeRemaining = n.targetTime - currentTimeMs;
-      
-      // Calculate Head Y
       const progress = 1 - (timeRemaining / noteSpeed);
-      let headY = -50 + (progress * (hitLineY + 50)); 
+      let headY = trackTop - 24 + (progress * (hitLineY - trackTop + 24)); 
       n.y = headY;
 
       // HOLD NOTE LOGIC
       if (n.type === 'HOLD') {
            const tailTimeRemaining = timeRemaining + n.length;
            const tailProgress = 1 - (tailTimeRemaining / noteSpeed);
-           const tailY = -50 + (tailProgress * (hitLineY + 50));
+           const tailY = trackTop - 24 + (tailProgress * (hitLineY - trackTop + 24));
 
-           // HOLDING LOGIC
            if (n.holding) {
-               // Check if released early
                if (!lanePressedRef.current[n.lane]) {
                    n.holding = false;
-                   n.hit = true; // Remove
+                   n.hit = true;
                    registerMiss();
                    return false; 
                }
                
-               // Check if completed
                if (currentTimeMs >= n.targetTime + n.length) {
                    n.holding = false;
                    n.hit = true;
-                   
                    let points = 300;
                    let text = 'COMPLETE';
                    
@@ -722,159 +822,108 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                    return false;
                }
 
-               // Lock Head to Hit Line while holding
                headY = hitLineY;
-               
-               // Create Sparks while holding
                if (Math.random() > 0.5) {
-                   createBurst(n.lane * laneWidth + laneWidth / 2, hitLineY);
+                   createBurst(playAreaX + n.lane * laneWidth + laneWidth / 2, hitLineY);
                }
            }
 
-           // Draw Body (from Tail to Head)
            const bodyHeight = headY - tailY;
-           if (bodyHeight > 0 && tailY < height + 50) {
-                const x = n.lane * laneWidth;
+           if (bodyHeight > 0 && tailY < hitLineY + 20) {
+                const x = playAreaX + n.lane * laneWidth;
                 const w = laneWidth;
+                const isOuter = (n.lane === 0 || n.lane === 3);
                 
-                // Body Gradient
                 const grad = ctx.createLinearGradient(x, tailY, x, headY);
-                grad.addColorStop(0, `${effectColor}44`); // More transparent at tail
-                grad.addColorStop(1, `${effectColor}aa`); // Solid at head
+                grad.addColorStop(0, isOuter ? 'rgba(226, 232, 240, 0.35)' : 'rgba(56, 189, 248, 0.35)');
+                grad.addColorStop(1, isOuter ? 'rgba(248, 250, 252, 0.85)' : 'rgba(14, 165, 233, 0.85)');
                 
                 ctx.fillStyle = grad;
-                ctx.fillRect(x + 12, tailY, w - 24, bodyHeight);
+                ctx.fillRect(x + 6, tailY, w - 12, bodyHeight);
                 
                 // Tail Cap
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(x + 12, tailY, w - 24, 6);
+                ctx.fillRect(x + 6, tailY, w - 12, 5);
            }
       }
 
-      // Miss detection (Head passed line significantly)
-      // For holds, if not holding and head passes, it's a miss
       if (timeRemaining < -200 && !n.holding && !n.hit) { 
         n.hit = true;
         registerMiss();
-        return false; // Remove
+        return false;
       }
 
-      if (n.hit) return false; // Remove
+      if (n.hit) return false;
 
       // Draw Note Head
-      if (headY > -50 && headY < height + 50) {
-          const x = n.lane * laneWidth;
+      if (headY > trackTop - 30 && headY < hitLineY + 30) {
+          const x = playAreaX + n.lane * laneWidth;
           const w = laneWidth;
           
           if (assets.tile && assets.tile.complete && assets.tile.naturalWidth !== 0) {
-              // Draw TILE Image
-              ctx.drawImage(assets.tile, x + 4, headY - 12, w - 8, 24);
+              ctx.drawImage(assets.tile, x + 2, headY - 9, w - 4, 18);
           } else {
-              // Draw Default Note
-              const grad = ctx.createLinearGradient(x, headY - 15, x, headY + 15);
+              // Authentic DJMax Portable 2 notes: Silver-White outer & Electric-Blue inner
+              const isOuter = (n.lane === 0 || n.lane === 3);
+              const grad = ctx.createLinearGradient(x, headY - 9, x, headY + 9);
+              
               if (n.type === 'HOLD') {
-                grad.addColorStop(0, '#fcd34d'); 
+                grad.addColorStop(0, '#fef08a'); 
                 grad.addColorStop(0.5, '#f59e0b');
                 grad.addColorStop(1, '#b45309');
+              } else if (isOuter) {
+                // Metallic White / Silver bar (Lanes 1 & 4)
+                grad.addColorStop(0, '#ffffff'); 
+                grad.addColorStop(0.55, '#cbd5e1');
+                grad.addColorStop(1, '#64748b');
               } else {
+                // Electric Cyan / Blue bar (Lanes 2 & 3)
                 grad.addColorStop(0, '#bae6fd'); 
-                grad.addColorStop(0.5, '#3b82f6');
-                grad.addColorStop(1, '#1e3a8a');
+                grad.addColorStop(0.5, '#0284c7');
+                grad.addColorStop(1, '#1e40af');
               }
               
               ctx.fillStyle = grad;
               ctx.beginPath();
-              ctx.roundRect(x + 4, headY - 12, w - 8, 24, 8);
+              ctx.roundRect(x + 2.5, headY - 9, w - 5, 18, 3);
               ctx.fill();
               
-              // Simple shine
-              ctx.fillStyle = 'rgba(255,255,255,0.5)';
-              ctx.fillRect(x + 10, headY - 8, w - 20, 4);
+              // Glossy white top highlight bevel
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+              ctx.fillRect(x + 5, headY - 7, w - 10, 3);
+
+              // Bottom crisp cyan edge glow
+              ctx.fillStyle = isOuter ? 'rgba(56, 189, 248, 0.8)' : 'rgba(186, 230, 253, 0.9)';
+              ctx.fillRect(x + 5, headY + 5, w - 10, 2);
           }
       }
       
       return true;
     });
 
-    // Draw UI Elements (Standard Blending)
-    ctx.globalCompositeOperation = 'source-over';
-    
-    // Background Guides (Static)
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
-    for(let i=0; i<4; i++) {
-        if(i%2!==0) ctx.fillRect(i*laneWidth, 0, laneWidth, height);
-        // Divider
-        ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        ctx.fillRect(i*laneWidth, 0, 1, height);
-    }
-    
-    // Receptor Line (Glowing intensely during fever)
-    if (isFeverActiveRef.current) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.shadowColor = '#fbbf24';
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(0, hitLineY - 3, width, 6);
-        ctx.restore();
-    } else {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fillRect(0, hitLineY - 2, width, 4);
-    }
+    ctx.restore(); // End track clip
 
-    // Keys & Presses
-    for (let i = 0; i < 4; i++) {
-      const centerX = i * laneWidth + laneWidth / 2;
-      
-      // Key Label
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.font = '900 24px Orbitron';
-      ctx.textAlign = 'center';
-      ctx.fillText(profile.keybinds[i].toUpperCase(), centerX, height - 20);
-
-      if (lanePressedRef.current[i]) {
-        // Press visual
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.fillRect(i * laneWidth + 5, hitLineY - 5, laneWidth - 10, 10);
-        
-        // Beam (Light effect)
-        ctx.globalCompositeOperation = 'lighter';
-        const grad = ctx.createLinearGradient(centerX, hitLineY, centerX, hitLineY - 300);
-        grad.addColorStop(0, `${effectColor}88`);
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
-        ctx.fillRect(i * laneWidth, hitLineY - 300, laneWidth, 300);
-        ctx.globalCompositeOperation = 'source-over';
-      } else {
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.strokeRect(i * laneWidth + 10, hitLineY - 5, laneWidth - 20, 10);
-      }
-    }
-
-    // PARTICLES (Batch Render)
+    // 7. PARTICLES (Batch Render at Hit Line)
     ctx.globalCompositeOperation = 'lighter';
     particlesRef.current = particlesRef.current.filter(p => {
-      p.life -= 0.04; // Faster fade
+      p.life -= 0.045;
       if (p.life <= 0) return false;
 
       ctx.globalAlpha = p.life;
 
-      // Safety check: ensure image is loaded and valid before drawing
       if (p.type === 'BURST_IMAGE' && assets.effect && assets.effect.complete && assets.effect.naturalWidth !== 0) {
         ctx.save();
         ctx.translate(p.x, p.y);
-        const s = p.size * (1 + (1-p.life)); // Expand
+        const s = p.size * (1 + (1-p.life));
         ctx.rotate((1-p.life) * 1.5);
         try { ctx.drawImage(assets.effect, -s/2, -s/2, s, s); } catch (e) {}
         ctx.restore();
       } else if (p.type === 'BURST_IMAGE') {
-         // Fallback burst if image failed or not ready
-         ctx.fillStyle = 'white';
+         ctx.fillStyle = '#bae6fd';
          ctx.beginPath();
-         ctx.arc(p.x, p.y, p.size * (1-p.life), 0, Math.PI*2);
+         ctx.arc(p.x, p.y, p.size * 0.7 * (1-p.life), 0, Math.PI*2);
          ctx.fill();
       } else {
-        // Spark
         p.x += p.vx; p.y += p.vy;
         ctx.fillStyle = p.color;
         ctx.beginPath(); 
@@ -886,47 +935,311 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
 
-    // FEVER GAUGE UI
-    const barW = 16;
-    const barH = height * 0.35;
-    const barX = 20; // Left side margin
-    const barY = height * 0.5 - barH / 2;
-    
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.strokeStyle = isFeverActiveRef.current ? '#fbbf24' : 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 2;
+    // 8. Top Silver Visor & Dark Navy LCD Header
+    ctx.fillStyle = '#0b1120';
     ctx.beginPath();
-    ctx.roundRect(barX, barY, barW, barH, 8);
+    ctx.roundRect(gearX + 6, gearTop + 5, gearWidth - 12, topDeckH - 8, 8);
     ctx.fill();
+
+    // Metallic bevel around top LCD visor
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(gearX + 6, gearTop + 5, gearWidth - 12, topDeckH - 8, 8);
     ctx.stroke();
 
-    const fillPct = isFeverActiveRef.current ? Math.max(0, (feverEndTimeRef.current - currentTimeMs) / 7000) : feverRef.current / 100;
-    const fillH = barH * fillPct;
-    
+    // Cyan LED accent bar beneath top visor
     ctx.save();
-    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#ec4899';
-    if (isFeverActiveRef.current) {
-        ctx.shadowColor = '#fbbf24';
-        ctx.shadowBlur = 10;
-    }
-    ctx.beginPath();
-    ctx.roundRect(barX, barY + barH - fillH, barW, fillH, 8);
-    ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    const visorBarGrad = ctx.createLinearGradient(playAreaX, 0, playAreaX + playAreaWidth, 0);
+    visorBarGrad.addColorStop(0, '#0284c7');
+    visorBarGrad.addColorStop(0.5, '#e0f2fe');
+    visorBarGrad.addColorStop(1, '#0284c7');
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : visorBarGrad;
+    ctx.fillRect(playAreaX, trackTop - 2, playAreaWidth, 2.5);
     ctx.restore();
 
-    ctx.save();
-    ctx.translate(barX + barW/2, barY - 20);
-    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : (feverRef.current >= 100 ? '#fbbf24' : 'rgba(255,255,255,0.5)');
-    ctx.font = '900 14px Orbitron';
+    // Top Visor Readout Text
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '900 10px Orbitron, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('4B', gearX + 16, gearTop + 26);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '900 11px Orbitron, sans-serif';
     ctx.textAlign = 'center';
-    if (isFeverActiveRef.current || feverRef.current >= 100) {
-        ctx.shadowColor = '#fbbf24'; 
-        ctx.shadowBlur = 10;
-        const textScale = 1 + Math.sin(currentTimeMs/100)*0.1;
-        ctx.scale(textScale, textScale);
+    ctx.fillText('DJMAX PORTABLE 2', gearX + gearWidth / 2, gearTop + 23);
+
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#94a3b8';
+    ctx.font = '800 8px Orbitron, sans-serif';
+    ctx.fillText(`SPEED x${(1500 / noteSpeed).toFixed(1)}`, gearX + gearWidth / 2, gearTop + 34);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '900 10px Orbitron, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${selectedSong?.bpm || 120}`, gearX + gearWidth - 16, gearTop + 26);
+
+    // 9. Left Rail: Integrated Vertical FEVER Meter (Classic DMP2 Style)
+    const leftSlotX = gearX + 5;
+    const slotW = railWidth - 10;
+    const slotTop = trackTop + 8;
+    const slotBottom = hitLineY - 18;
+    const slotH = Math.max(40, slotBottom - slotTop);
+
+    ctx.fillStyle = '#090d16';
+    ctx.beginPath();
+    ctx.roundRect(leftSlotX, slotTop, slotW, slotH, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const feverPct = isFeverActiveRef.current
+        ? Math.max(0, (feverEndTimeRef.current - currentTimeMs) / 7000)
+        : Math.min(1, feverRef.current / 100);
+    const feverSegs = 24;
+    const fSegH = (slotH - 6) / feverSegs;
+    const activeFeverSegs = Math.round(feverPct * feverSegs);
+
+    for (let s = 0; s < feverSegs; s++) {
+        const sy = slotBottom - 3 - (s + 1) * fSegH;
+        const lit = s < activeFeverSegs;
+        let color = '#0284c7';
+        if (s > feverSegs * 0.72) color = '#f59e0b';
+        else if (s > feverSegs * 0.4) color = '#38bdf8';
+        if (isFeverActiveRef.current && lit) color = (Math.floor(currentTimeMs / 80) % 2 === 0) ? '#fbbf24' : '#fef08a';
+
+        ctx.fillStyle = lit ? color : 'rgba(255, 255, 255, 0.08)';
+        ctx.fillRect(leftSlotX + 2, sy + 1, slotW - 4, Math.max(1.5, fSegH - 2));
     }
-    ctx.fillText(isFeverActiveRef.current ? 'FEVER' : (feverRef.current >= 100 ? 'READY' : 'FEVER'), 0, 0);
+
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#e2e8f0';
+    ctx.font = '900 7px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('FVR', leftSlotX + slotW / 2, hitLineY - 5);
+
+    // 10. Right Rail: Integrated Vertical HP / Groove Meter (Classic DMP2 Style)
+    const rightSlotX = gearX + gearWidth - railWidth + 5;
+    ctx.fillStyle = '#090d16';
+    ctx.beginPath();
+    ctx.roundRect(rightSlotX, slotTop, slotW, slotH, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const hpPct = Math.max(0, Math.min(1, healthRef.current / 100));
+    const activeHpSegs = Math.round(hpPct * feverSegs);
+
+    for (let s = 0; s < feverSegs; s++) {
+        const sy = slotBottom - 3 - (s + 1) * fSegH;
+        const lit = s < activeHpSegs;
+        let hpColor = '#22c55e';
+        if (hpPct < 0.3) hpColor = '#ef4444';
+        else if (s > feverSegs * 0.65) hpColor = '#38bdf8';
+        else if (s > feverSegs * 0.3) hpColor = '#10b981';
+
+        ctx.fillStyle = lit ? hpColor : 'rgba(255, 255, 255, 0.08)';
+        ctx.fillRect(rightSlotX + 2, sy + 1, slotW - 4, Math.max(1.5, fSegH - 2));
+    }
+
+    ctx.fillStyle = hpPct < 0.3 ? '#ef4444' : '#38bdf8';
+    ctx.font = '900 7px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HP', rightSlotX + slotW / 2, hitLineY - 5);
+
+    // 11. Bottom Brushed Metallic Key Deck Housing
+    const deckY = hitLineY;
+    const deckH = gearBottom - deckY;
+    const deckGrad = ctx.createLinearGradient(gearX, deckY, gearX, gearBottom);
+    deckGrad.addColorStop(0, '#94a3b8');
+    deckGrad.addColorStop(0.18, '#e2e8f0');
+    deckGrad.addColorStop(0.45, '#64748b');
+    deckGrad.addColorStop(1, '#1e293b');
+    ctx.fillStyle = deckGrad;
+    ctx.beginPath();
+    ctx.roundRect(gearX + 2, deckY, gearWidth - 4, deckH - 2, [0, 0, 12, 12]);
+    ctx.fill();
+
+    // Recessed black key well
+    const keyWellH = 54;
+    ctx.fillStyle = '#090d16';
+    ctx.beginPath();
+    ctx.roundRect(playAreaX - 2, hitLineY + 4, playAreaWidth + 4, keyWellH, 6);
+    ctx.fill();
+
+    // 12. Judgment Line & Iconic DMP2 Side Arrow Pointers
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowColor = isFeverActiveRef.current ? '#fbbf24' : '#38bdf8';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#38bdf8';
+    ctx.fillRect(playAreaX, hitLineY - 2, playAreaWidth, 4);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(playAreaX, hitLineY - 1, playAreaWidth, 2);
     ctx.restore();
+
+    // Left & Right Arrow Pointers pointing inward to judgment line
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#38bdf8';
+    ctx.beginPath();
+    ctx.moveTo(playAreaX - 7, hitLineY - 5);
+    ctx.lineTo(playAreaX + 1, hitLineY);
+    ctx.lineTo(playAreaX - 7, hitLineY + 5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(playAreaX + playAreaWidth + 7, hitLineY - 5);
+    ctx.lineTo(playAreaX + playAreaWidth - 1, hitLineY);
+    ctx.lineTo(playAreaX + playAreaWidth + 7, hitLineY + 5);
+    ctx.closePath();
+    ctx.fill();
+
+    // 13. 3D Beveled Glossy Keycaps inside the DMP2 Deck
+    const keyH = 48;
+    const keyY = hitLineY + 7;
+    for (let i = 0; i < 4; i++) {
+        const lx = playAreaX + i * laneWidth;
+        const isPressed = lanePressedRef.current[i];
+        const isOuter = (i === 0 || i === 3);
+
+        ctx.save();
+        const kGrad = ctx.createLinearGradient(lx, keyY, lx, keyY + keyH);
+        if (isPressed) {
+            if (isFeverActiveRef.current) {
+                kGrad.addColorStop(0, '#fef08a');
+                kGrad.addColorStop(1, '#d97706');
+            } else if (isOuter) {
+                kGrad.addColorStop(0, '#ffffff');
+                kGrad.addColorStop(1, '#38bdf8');
+            } else {
+                kGrad.addColorStop(0, '#7dd3fc');
+                kGrad.addColorStop(1, '#0369a1');
+            }
+        } else {
+            if (isOuter) {
+                kGrad.addColorStop(0, '#e2e8f0');
+                kGrad.addColorStop(0.55, '#94a3b8');
+                kGrad.addColorStop(1, '#475569');
+            } else {
+                kGrad.addColorStop(0, '#38bdf8');
+                kGrad.addColorStop(0.55, '#0369a1');
+                kGrad.addColorStop(1, '#0f172a');
+            }
+        }
+
+        ctx.fillStyle = kGrad;
+        ctx.beginPath();
+        ctx.roundRect(lx + 2.5, keyY, laneWidth - 5, keyH, 4);
+        ctx.fill();
+
+        // Top gloss bevel on keycap
+        ctx.fillStyle = isPressed ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 255, 255, 0.35)';
+        ctx.fillRect(lx + 4.5, keyY + 2, laneWidth - 9, 6);
+
+        ctx.strokeStyle = isPressed ? '#ffffff' : 'rgba(15, 23, 42, 0.7)';
+        ctx.lineWidth = isPressed ? 1.5 : 1;
+        ctx.beginPath();
+        ctx.roundRect(lx + 2.5, keyY, laneWidth - 5, keyH, 4);
+        ctx.stroke();
+
+        // Keybind character engraved on keycap
+        ctx.fillStyle = isPressed ? '#0f172a' : (isOuter ? '#0f172a' : '#f8fafc');
+        ctx.font = '900 15px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText((profile.keybinds[i] || '').toUpperCase(), lx + laneWidth / 2, keyY + keyH / 2 + 2);
+        ctx.restore();
+    }
+
+    // Bottom Metallic Nameplate & Status Strip
+    const plateY = keyY + keyH + 8;
+    ctx.fillStyle = '#090d16';
+    ctx.beginPath();
+    ctx.roundRect(gearX + 12, plateY, gearWidth - 24, 20, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : (feverRef.current >= 100 ? '#fbbf24' : '#38bdf8');
+    ctx.font = '800 8px Orbitron, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isFeverActiveRef.current ? 'FEVER ACTIVE' : (feverRef.current >= 100 ? 'FEVER READY' : `FVR ${Math.floor(feverRef.current)}%`), gearX + 20, plateY + 10);
+
+    ctx.fillStyle = '#cbd5e1';
+    ctx.textAlign = 'center';
+    ctx.fillText('PORTABLE 2', gearX + gearWidth / 2, plateY + 10);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'right';
+    ctx.fillText(`HP ${Math.max(0, Math.round(healthRef.current))}%`, gearX + gearWidth - 20, plateY + 10);
+
+    // Metallic corner rivets on the DMP2 silver chassis
+    const rivets = [
+        [gearX + 10, gearTop + 10],
+        [gearX + gearWidth - 10, gearTop + 10],
+        [gearX + 10, gearBottom - 10],
+        [gearX + gearWidth - 10, gearBottom - 10]
+    ];
+    rivets.forEach(([rx, ry]) => {
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.arc(rx, ry, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e2e8f0';
+        ctx.beginPath();
+        ctx.arc(rx - 0.5, ry - 0.5, 1, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // 14. In-Gear Combo Counter (Classic DMP2 Bold Metallic Italic inside upper-middle playfield)
+    if (comboRef.current > 0) {
+        ctx.save();
+        const comboY = trackTop + (hitLineY - trackTop) * 0.44;
+        ctx.font = 'italic 900 46px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(2, 6, 23, 0.9)';
+        ctx.strokeText(`${comboRef.current}`, playAreaX + playAreaWidth / 2, comboY);
+        ctx.fillStyle = '#f8fafc';
+        ctx.shadowColor = isFeverActiveRef.current ? '#fbbf24' : '#38bdf8';
+        ctx.shadowBlur = 14;
+        ctx.fillText(`${comboRef.current}`, playAreaX + playAreaWidth / 2, comboY);
+
+        ctx.font = 'italic 900 11px Orbitron, sans-serif';
+        ctx.fillStyle = isFeverActiveRef.current ? '#fbbf24' : '#7dd3fc';
+        ctx.shadowBlur = 6;
+        ctx.fillText(isFeverActiveRef.current ? 'FEVER COMBO' : 'COMBO', playAreaX + playAreaWidth / 2, comboY + 16);
+        ctx.restore();
+    }
+
+    // 15. In-Gear Judgment Badge (DMP2 Style right above judgment line)
+    const activeFb = feedbackRef.current;
+    if (activeFb && performance.now() - activeFb.timestamp < 950) {
+        ctx.save();
+        const judgeY = hitLineY - 58;
+        const ageRatio = (performance.now() - activeFb.timestamp) / 950;
+        ctx.globalAlpha = ageRatio > 0.7 ? Math.max(0, 1 - (ageRatio - 0.7) / 0.3) : 1;
+        ctx.font = 'italic 900 22px Orbitron, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(2, 6, 23, 0.9)';
+        ctx.strokeText(activeFb.text, playAreaX + playAreaWidth / 2, judgeY);
+        ctx.fillStyle = activeFb.text === 'MISS' ? '#ef4444' : (activeFb.text.includes('PERFECT') || activeFb.text.includes('FEVER') || activeFb.text.includes('COMPLETE') ? '#38bdf8' : '#fef08a');
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 12;
+        ctx.fillText(activeFb.text, playAreaX + playAreaWidth / 2, judgeY);
+
+        ctx.font = '800 11px Orbitron, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 4;
+        ctx.fillText(`${activeFb.percent.toFixed(0)}%`, playAreaX + playAreaWidth / 2, judgeY + 16);
+        ctx.restore();
+    }
 
     requestRef.current = requestAnimationFrame(update);
   }, [gameState, selectedSong, effectColor, assets, profile.keybinds, pollGamepad, showSettings, playFeverSound]);
@@ -1499,94 +1812,122 @@ const RhythmGame: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <>
           <canvas ref={canvasRef} className="absolute inset-0 z-10 w-full h-full pointer-events-none transform-gpu will-change-transform" />
           
-          <div className="absolute inset-0 z-20 flex">
-             {[0,1,2,3].map(i => (
-                 <div key={i} className="flex-1 active:bg-white/5" onTouchStart={(e) => { e.preventDefault(); handlePress(i); }} onTouchEnd={(e) => { e.preventDefault(); lanePressedRef.current[i] = false; }} />
-             ))}
-          </div>
+          {/* Smart Pointer / Touch Input Overlay mapped cleanly to DMP2 Gear Lanes */}
+          <div
+              className="absolute inset-0 z-20 cursor-pointer touch-none"
+              onMouseDown={(e) => {
+                  const canvas = canvasRef.current;
+                  if (!canvas) return;
+                  const rect = canvas.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const { playAreaX, playAreaWidth, laneWidth } = computeGearMetrics(rect.width, rect.height);
+                  const lane = x >= playAreaX && x <= playAreaX + playAreaWidth
+                      ? Math.min(3, Math.max(0, Math.floor((x - playAreaX) / laneWidth)))
+                      : Math.min(3, Math.max(0, Math.floor((x / rect.width) * 4)));
+                  handlePress(lane);
+              }}
+              onMouseUp={() => {
+                  lanePressedRef.current = [false, false, false, false];
+              }}
+              onTouchStart={(e) => {
+                  e.preventDefault();
+                  const canvas = canvasRef.current;
+                  if (!canvas) return;
+                  const rect = canvas.getBoundingClientRect();
+                  const { playAreaX, playAreaWidth, laneWidth } = computeGearMetrics(rect.width, rect.height);
+                  for (let i = 0; i < e.changedTouches.length; i++) {
+                      const t = e.changedTouches.item(i);
+                      if (!t) continue;
+                      const x = t.clientX - rect.left;
+                      const lane = x >= playAreaX && x <= playAreaX + playAreaWidth
+                          ? Math.min(3, Math.max(0, Math.floor((x - playAreaX) / laneWidth)))
+                          : Math.min(3, Math.max(0, Math.floor((x / rect.width) * 4)));
+                      handlePress(lane);
+                  }
+              }}
+              onTouchEnd={(e) => {
+                  e.preventDefault();
+                  if (e.touches.length === 0) {
+                      lanePressedRef.current = [false, false, false, false];
+                  }
+              }}
+          />
 
-          <div className="absolute top-8 left-8 right-8 flex justify-between items-start z-30 pointer-events-none">
-            <div className="bg-black/60 backdrop-blur-md p-6 rounded-3xl border-2 border-green-500/50 min-w-[200px] shadow-[0_0_20px_rgba(34,197,94,0.2)]">
-              <div className="flex items-center gap-3 mb-2">
-                  <div className="relative">
-                      <div className="w-8 h-8 rounded-full overflow-hidden border border-white"><img src={profile.avatar} className="w-full h-full object-cover" /></div>
-                      <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-black" />
+          {/* Top-Right DMP2 Digital HUD (Leaves Left Gear & Right BGA Clear) */}
+          <div className="absolute top-5 right-5 left-5 sm:left-[40%] flex flex-wrap justify-end items-start gap-3 z-30 pointer-events-none">
+            {/* Track Info Banner */}
+            <div className="bg-slate-950/75 backdrop-blur-md px-5 py-3 rounded-2xl border border-cyan-400/30 shadow-lg text-right hidden md:block">
+              <div className="text-[10px] font-black text-cyan-400 tracking-[0.25em] uppercase">{selectedSong?.difficulty || 'NORMAL'} // {selectedSong?.bpm || 120} BPM</div>
+              <div className="text-base font-black italic text-white truncate max-w-[220px]">{selectedSong?.title}</div>
+            </div>
+
+            {/* Player Score Box (DMP2 Metallic/Cyan Frame) */}
+            <div className="bg-slate-950/75 backdrop-blur-md px-5 py-3 rounded-2xl border-2 border-slate-400/40 min-w-[175px] shadow-[0_0_20px_rgba(56,189,248,0.18)]">
+              <div className="flex items-center justify-between gap-3 mb-1">
+                  <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full overflow-hidden border border-cyan-300"><img src={profile.avatar} className="w-full h-full object-cover" /></div>
+                      <div className="text-[10px] text-cyan-300 font-black uppercase tracking-wider">{profile.username}</div>
                   </div>
-                  <div className="text-xs text-green-400 font-black uppercase tracking-wider">{profile.username}</div>
+                  <div className="text-[10px] font-black text-slate-400">{accuracy.toFixed(1)}%</div>
               </div>
-              <div className="text-4xl font-black italic">{score.toLocaleString()}</div>
+              <div className="text-3xl font-black italic text-white tracking-wider">{score.toLocaleString()}</div>
             </div>
 
-            <div className="text-center group">
-              <div className="text-9xl font-black italic text-white drop-shadow-[0_0_40px_rgba(255,255,255,0.4)] animate-combo">{combo}</div>
-              <div className="text-sm font-black text-pink-500 tracking-[0.5em] uppercase -mt-4">Combo</div>
-            </div>
-
-            <div className={`bg-black/60 backdrop-blur-md p-6 rounded-3xl border-2 min-w-[200px] text-right ${isVersus ? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]' : 'border-white/10'}`}>
-               {isVersus && opponent ? (
-                   <>
-                    <div className="flex items-center justify-end gap-3 mb-2">
-                         <div className={`text-xs font-black uppercase tracking-wider ${opponent.isAi ? 'text-red-400' : 'text-green-400'}`}>{opponent.name}</div>
-                         <div className="relative">
-                            <div className="w-8 h-8 rounded-full overflow-hidden border border-white"><img src={opponent.avatar} className="w-full h-full object-cover" /></div>
-                            <div className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-black ${opponent.isAi ? 'bg-red-500' : 'bg-green-500'}`} />
-                         </div>
+            {/* Versus Opponent Card (Only in Versus) */}
+            {isVersus && opponent && (
+                <div className="bg-slate-950/75 backdrop-blur-md px-5 py-3 rounded-2xl border-2 border-red-500/50 min-w-[165px] text-right shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                    <div className="flex items-center justify-end gap-2 mb-1">
+                        <div className={`text-[10px] font-black uppercase tracking-wider ${opponent.isAi ? 'text-red-400' : 'text-green-400'}`}>{opponent.name}</div>
+                        <div className="w-6 h-6 rounded-full overflow-hidden border border-white"><img src={opponent.avatar} className="w-full h-full object-cover" /></div>
                     </div>
-                    <div className="text-4xl font-black italic text-red-500">{opponent.score.toLocaleString()}</div>
-                   </>
-               ) : (
-                   <>
-                    <div className="text-4xl font-black italic text-cyan-400">{accuracy.toFixed(1)}%</div>
-                    <div className="text-[10px] text-cyan-500 font-black tracking-widest uppercase">PRECISION</div>
-                   </>
-               )}
-            </div>
+                    <div className="text-3xl font-black italic text-red-500">{opponent.score.toLocaleString()}</div>
+                </div>
+            )}
+
+            {/* PAUSE BUTTON */}
+            <button 
+                onClick={() => { pauseTimeRef.current = performance.now(); setGameState(GameState.PAUSED); }} 
+                className="bg-slate-950/75 backdrop-blur-md w-12 h-12 rounded-2xl border border-slate-400/40 flex items-center justify-center hover:bg-white/20 pointer-events-auto transition-transform active:scale-95 shadow-xl"
+                title="Pause"
+            >
+                <span className="text-lg">⏸️</span>
+            </button>
           </div>
 
           {/* PET RENDER */}
           {assets.pet && (
-              <div className="absolute bottom-32 left-0 w-full z-20 pointer-events-none h-24 overflow-hidden">
+              <div className="absolute bottom-24 right-0 left-0 sm:left-[40%] z-20 pointer-events-none h-20 overflow-hidden">
                  <img 
                     src={assets.pet} 
-                    className="absolute top-0 w-24 h-24 object-contain drop-shadow-[0_0_20px_rgba(52,211,153,0.5)] animate-pet-run" 
+                    className="absolute top-0 w-20 h-20 object-contain drop-shadow-[0_0_20px_rgba(52,211,153,0.5)] animate-pet-run" 
                  />
               </div>
           )}
-          
-          <button onClick={() => { pauseTimeRef.current = performance.now(); setGameState(GameState.PAUSED); }} className="absolute top-8 right-8 z-40 bg-white/10 backdrop-blur-md w-14 h-14 rounded-full border border-white/20 flex items-center justify-center hover:bg-white/20 pointer-events-auto">⏸️</button>
-          
+
           {/* MANUAL FEVER BUTTON */}
           {feverReady && !profile.settings.autoFever && (
              <button
                  onClick={activateFever}
-                 className="absolute left-[20px] top-[60%] z-40 bg-gradient-to-br from-orange-500 to-red-600 text-white font-black italic text-2xl px-8 py-6 rounded-3xl border-4 border-yellow-400 shadow-[0_0_40px_rgba(251,191,36,0.6)] animate-pulse active:scale-95 flex flex-col items-center justify-center hover:scale-105 transition-all pointer-events-auto"
+                 className="absolute right-6 bottom-24 z-40 bg-gradient-to-br from-orange-500 via-amber-500 to-red-600 text-white font-black italic text-xl px-7 py-4 rounded-2xl border-2 border-yellow-300 shadow-[0_0_30px_rgba(251,191,36,0.6)] animate-pulse active:scale-95 flex flex-col items-center justify-center hover:scale-105 transition-all pointer-events-auto"
              >
-                 <span className="drop-shadow-lg">FEVER!</span>
-                 <span className="text-xs bg-black/50 px-3 py-1 rounded-lg mt-2 font-bold tracking-widest border border-white/20 uppercase">{(profile.settings.feverKeybind || ' ') === ' ' ? 'SPACE' : profile.settings.feverKeybind} / BTN {profile.settings.feverGamepadBinding ?? 0}</span>
+                 <span className="drop-shadow-lg tracking-wider">FEVER!</span>
+                 <span className="text-[10px] bg-black/50 px-3 py-1 rounded-lg mt-1 font-bold tracking-widest border border-white/20 uppercase">{(profile.settings.feverKeybind || ' ') === ' ' ? 'SPACE' : profile.settings.feverKeybind} / BTN {profile.settings.feverGamepadBinding ?? 0}</span>
              </button>
           )}
 
-          {feedback && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center pointer-events-none animate-pop-in">
-              <div className={`font-black italic text-8xl drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] bg-clip-text text-transparent bg-gradient-to-b ${getFeedbackClass(feedback.text)} ${(feedback.text.includes('🔥') || feedback.text.includes('FEVER')) ? 'scale-125 drop-shadow-[0_0_30px_rgba(251,191,36,0.8)] animate-pulse' : ''}`}>
-                  {feedback.text}
-              </div>
-              <div className="text-2xl font-black italic text-white/90 mt-2 bg-black/60 px-4 py-1 rounded-full border border-white/10">{feedback.percent.toFixed(0)}%</div>
-            </div>
-          )}
-
-          <div className="absolute bottom-12 w-full px-12 z-20 flex flex-col items-center gap-4">
+          {/* Bottom-Right Song Progress & Health Bar (Clear of Left DMP2 Gear) */}
+          <div className="absolute bottom-5 right-6 left-6 sm:left-[42%] z-20 flex flex-col items-end gap-2 pointer-events-none">
              {selectedSong && (
-                 <div className="w-full max-w-2xl flex items-center gap-4">
-                    <span className="text-[10px] font-black text-gray-500">START</span>
-                    <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-cyan-500 transition-all duration-100" style={{ width: `${Math.min(100, ((performance.now() - startTimeRef.current) / 1000 / selectedSong.duration) * 100)}%` }} />
+                 <div className="w-full max-w-md flex items-center gap-3 bg-slate-950/60 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/10">
+                    <span className="text-[9px] font-black text-cyan-400">TIME</span>
+                    <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-100" style={{ width: `${Math.min(100, ((performance.now() - startTimeRef.current) / 1000 / selectedSong.duration) * 100)}%` }} />
                     </div>
-                    <span className="text-[10px] font-black text-gray-500">END</span>
+                    <span className="text-[9px] font-black text-slate-400">{Math.max(0, Math.ceil(selectedSong.duration - (performance.now() - startTimeRef.current) / 1000))}s</span>
                  </div>
              )}
-            <div className="w-full max-w-2xl h-6 bg-white/5 rounded-full overflow-hidden self-center border border-white/10 p-1">
-                <div className={`h-full rounded-full transition-all duration-300 ${health < 30 ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-pink-500 to-cyan-500'}`} style={{ width: `${health}%` }} />
+            <div className="w-full max-w-md h-3 bg-slate-950/70 rounded-full overflow-hidden border border-slate-500/40 p-0.5 sm:hidden">
+                <div className={`h-full rounded-full transition-all duration-300 ${health < 30 ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-emerald-400 to-cyan-400'}`} style={{ width: `${health}%` }} />
             </div>
           </div>
         </>

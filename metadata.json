@@ -2,5 +2,7 @@
   "name": "DJMIX LOVE V",
   "description": "Premium anime-inspired rhythm and adventure performance interface featuring multi-mode gameplay and Nexus Gacha.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
